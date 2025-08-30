@@ -8,6 +8,10 @@ add_executable(${PROJECT_NAME}
 
 target_include_directories(${PROJECT_NAME} PUBLIC ${PROJECT_SOURCE_DIR}/include)
 
-target_link_libraries(${PROJECT_NAME} raylib)
+target_link_libraries(${PROJECT_NAME}
+  PRIVATE
+    raylib
+    graphics
+)
 
 install(TARGETS ${PROJECT_NAME})

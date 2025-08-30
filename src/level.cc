@@ -1,18 +1,15 @@
 #include "spaceinvaders/level.h"
+
+#include "graphics/sprites.h"
 #include "raylib.h"
 #include "raymath.h"
 #include "spaceinvaders/screens.h"
 #include "spaceinvaders/states.h"
 #include <format>
-#include <iostream>
 #include <memory>
 #include <vector>
 
 const int MAX_VELOCITY = 500;
-const int START_BALL_SPEED = 3;
-const int MAX_BALL_SPEED = 10;
-const float BALL_ACCELERATION_AFTER_BRICK = 1.02;
-const int DEATH_TIMER = 120;
 const int DOWN_DISTANCE = 32;
 const float INVADER_SPEED = 40;
 const int BALL_SPEED = 200;
@@ -56,44 +53,14 @@ struct Invader {
   bool alive;
 };
 
-class AnimatedTexture {
-
-public:
-  AnimatedTexture(Texture2D texture, int nb_frames, int frame_speed)
-      : texture(texture), nb_frames(nb_frames), frame_speed(frame_speed) {}
-
-  void Update() {
-    frame_counter++;
-    if (frame_counter >= 60 / frame_speed) {
-      frame_counter = 0;
-      current_frame++;
-      if (current_frame >= nb_frames) {
-        current_frame = 0;
-      }
-    }
-  }
-
-  void DrawPro(Vector2 position, Vector2 size, float rotation, Color tint) {
-    DrawTexturePro(
-        texture,
-        {float(current_frame * 16), 0, float(texture.height),
-         float(texture.height)},
-        {position.x + size.x / 2, position.y + size.y / 2, size.x, size.y},
-        {size.x / 2, size.y / 2}, rotation, tint);
-  }
-
-  void Init() {
-    frame_counter = 0;
-    current_frame = 0;
-  }
-
-private:
-  int frame_counter;
-  int nb_frames;
-  int frame_speed; // nb images per second
-  int current_frame;
-  Texture2D texture;
-};
+Rectangle translateRec(Rectangle rec, Vector2 offset) {
+  return {
+      .x = rec.x + offset.x,
+      .y = rec.y + offset.y,
+      .width = rec.width,
+      .height = rec.height,
+  };
+}
 
 class Level : public Screen {
 
@@ -114,10 +81,6 @@ public:
                    {32, 32}, (cannon.velocity.x / 60) * PI / 2, WHITE);
 
     for (auto invader : invaders) {
-      if (!invader.alive) {
-        continue;
-      }
-
       invaderAnimation->DrawPro(invader.position, invader.size, 0, WHITE);
       // auto invader_rec = Rectangle{
       //     invader.position.x + invader.collision_rec.x,
@@ -166,11 +129,9 @@ public:
         Vector2{float(Width() - cannon.size.x) / 2, float(Height()) - 72};
     cannon.velocity = Vector2Zero();
 
-    invaderAnimation = std::make_unique<AnimatedTexture>(invaderTexture, 4, 4);
-    invaderAnimation->Init();
+    invaderAnimation = std::make_unique<AnimatedSprite>(invaderTexture, 4, 4);
+    bulletAnimation = std::make_unique<AnimatedSprite>(bulletTexture, 4, 15);
 
-    bulletAnimation = std::make_unique<AnimatedTexture>(bulletTexture, 4, 15);
-    bulletAnimation->Init();
     next_cannon = RightCannon;
 
     invaders_direction = Right;
@@ -217,13 +178,13 @@ private:
   Texture2D invaderTexture;
   Texture2D bulletTexture;
 
-  std::unique_ptr<AnimatedTexture> invaderAnimation;
+  std::unique_ptr<AnimatedSprite> invaderAnimation;
   Vector2 invaders_velocity;
   float invaders_speed;
   InvaderDirection invaders_direction;
   float invaders_straight_distance;
 
-  std::unique_ptr<AnimatedTexture> bulletAnimation;
+  std::unique_ptr<AnimatedSprite> bulletAnimation;
   std::vector<Bullet> bullets;
   CannonSide next_cannon;
 
@@ -270,23 +231,16 @@ private:
         continue;
       }
 
-      auto bullet_rec = Rectangle{
-          bullet.element.position.x + bullet.element.collision_rec.x,
-          bullet.element.position.y + bullet.element.collision_rec.y,
-          bullet.element.collision_rec.width,
-          bullet.element.collision_rec.height,
-      };
+      auto bullet_rec =
+          translateRec(bullet.element.collision_rec, bullet.element.position);
 
       for (auto &invader : invaders) {
         if (!invader.alive) {
           continue;
         }
-        auto invader_rec = Rectangle{
-            invader.position.x + invader.collision_rec.x,
-            invader.position.y + invader.collision_rec.y,
-            invader.collision_rec.width,
-            invader.collision_rec.height,
-        };
+        auto invader_rec =
+            translateRec(invader.collision_rec, invader.position);
+
         auto col = GetCollisionRec(bullet_rec, invader_rec);
         if (col.height > 0 && col.width > 0) {
           invader.alive = false;
