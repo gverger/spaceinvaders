@@ -59,11 +59,8 @@ struct Invader {
 class AnimatedTexture {
 
 public:
-  AnimatedTexture(const char *image_file, int nb_frames, int frame_speed)
-      : texture(LoadTexture(image_file)), nb_frames(nb_frames),
-        frame_speed(frame_speed) {}
-
-  ~AnimatedTexture() { UnloadTexture(texture); }
+  AnimatedTexture(Texture2D texture, int nb_frames, int frame_speed)
+      : texture(texture), nb_frames(nb_frames), frame_speed(frame_speed) {}
 
   void Update() {
     frame_counter++;
@@ -101,6 +98,14 @@ private:
 class Level : public Screen {
 
 public:
+  Level() {}
+
+  ~Level() {
+    UnloadTexture(cannonTexture);
+    UnloadTexture(invaderTexture);
+    UnloadTexture(bulletTexture);
+  }
+
   void Draw() override {
 
     DrawTexturePro(cannonTexture, {0, 0, 32, 32},
@@ -113,7 +118,7 @@ public:
         continue;
       }
 
-      invaderTexture->DrawPro(invader.position, invader.size, 0, WHITE);
+      invaderAnimation->DrawPro(invader.position, invader.size, 0, WHITE);
       // auto invader_rec = Rectangle{
       //     invader.position.x + invader.collision_rec.x,
       //     invader.position.y + invader.collision_rec.y,
@@ -128,7 +133,7 @@ public:
       //     {bullet.position.x, bullet.position.y, bullet.size.x,
       //     bullet.size.y}, 2, RED);
       const MovingElement &element = bullet.element;
-      bulletTexture->DrawPro(element.position, element.size, 0, WHITE);
+      bulletAnimation->DrawPro(element.position, element.size, 0, WHITE);
     }
 
     drawHUD();
@@ -145,21 +150,27 @@ public:
   };
 
   void Init() {
+    if (!IsTextureValid(cannonTexture)) {
+      cannonTexture = LoadTexture("assets/cannon.png");
+    }
+    if (!IsTextureValid(invaderTexture)) {
+      invaderTexture = LoadTexture("assets/alien-1.png");
+    }
+    if (!IsTextureValid(bulletTexture)) {
+      bulletTexture = LoadTexture("assets/bullet.png");
+    }
+
     dead = false;
     cannon.size = Vector2{64, 64};
     cannon.position =
         Vector2{float(Width() - cannon.size.x) / 2, float(Height()) - 72};
     cannon.velocity = Vector2Zero();
 
-    cannonTexture = LoadTexture("assets/cannon.png");
+    invaderAnimation = std::make_unique<AnimatedTexture>(invaderTexture, 4, 4);
+    invaderAnimation->Init();
 
-    invaderTexture =
-        std::make_unique<AnimatedTexture>("assets/alien-1.png", 4, 4);
-    invaderTexture->Init();
-
-    bulletTexture =
-        std::make_unique<AnimatedTexture>("assets/bullet.png", 4, 15);
-    bulletTexture->Init();
+    bulletAnimation = std::make_unique<AnimatedTexture>(bulletTexture, 4, 15);
+    bulletAnimation->Init();
     next_cannon = RightCannon;
 
     invaders_direction = Right;
@@ -189,9 +200,9 @@ public:
 
     updateCannon();
     updateBullets();
-    bulletTexture->Update();
+    bulletAnimation->Update();
     updateInvaders();
-    invaderTexture->Update();
+    invaderAnimation->Update();
   }
 
   bool Lost() { return dead; }
@@ -203,13 +214,16 @@ private:
   std::vector<Invader> invaders;
 
   Texture2D cannonTexture;
-  std::unique_ptr<AnimatedTexture> invaderTexture;
+  Texture2D invaderTexture;
+  Texture2D bulletTexture;
+
+  std::unique_ptr<AnimatedTexture> invaderAnimation;
   Vector2 invaders_velocity;
   float invaders_speed;
   InvaderDirection invaders_direction;
   float invaders_straight_distance;
 
-  std::unique_ptr<AnimatedTexture> bulletTexture;
+  std::unique_ptr<AnimatedTexture> bulletAnimation;
   std::vector<Bullet> bullets;
   CannonSide next_cannon;
 
