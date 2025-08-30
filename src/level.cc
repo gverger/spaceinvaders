@@ -4,6 +4,7 @@
 #include "spaceinvaders/screens.h"
 #include "spaceinvaders/states.h"
 #include <format>
+#include <iostream>
 #include <memory>
 #include <vector>
 
@@ -14,6 +15,7 @@ const float BALL_ACCELERATION_AFTER_BRICK = 1.02;
 const int DEATH_TIMER = 120;
 const int DOWN_DISTANCE = 16;
 const float INVADER_SPEED = 40;
+const int BALL_SPEED = 200;
 
 enum InvaderDirection {
   Right,
@@ -22,10 +24,27 @@ enum InvaderDirection {
   Left,
 };
 
+enum CannonSide {
+  RightCannon,
+  LeftCannon,
+};
+
 struct MovingElement {
   Vector2 position;
   Vector2 size;
   Vector2 velocity;
+};
+
+enum BulletState {
+  Alive,
+  Exploding,
+  Dead,
+};
+
+struct Bullet {
+  MovingElement element;
+
+  BulletState state;
 };
 
 struct Invader {
@@ -95,7 +114,25 @@ public:
       invaderTexture->DrawPro(invader.position, invader.size, 0, WHITE);
     }
 
+    for (auto bullet : bullets) {
+      // DrawRectangleLinesEx(
+      //     {bullet.position.x, bullet.position.y, bullet.size.x,
+      //     bullet.size.y}, 2, RED);
+      const MovingElement &element = bullet.element;
+      bulletTexture->DrawPro(element.position, element.size, 0, WHITE);
+    }
+
     drawHUD();
+
+    DrawText(std::format("BALLS: {}", bullets.size()).c_str(), 10, 100, 10,
+             RED);
+    // if (!bullets.empty()) {
+    //   DrawText(std::format("BALL: {},{} {},{}", bullets[0].position.x,
+    //                        bullets[0].position.y, bullets[0].size.x,
+    //                        bullets[0].size.y)
+    //                .c_str(),
+    //            10, 120, 10, RED);
+    // }
   };
 
   void Init() {
@@ -110,6 +147,11 @@ public:
     invaderTexture =
         std::make_unique<AnimatedTexture>("assets/alien-1.png", 4, 4);
     invaderTexture->Init();
+
+    bulletTexture =
+        std::make_unique<AnimatedTexture>("assets/bullet.png", 4, 15);
+    bulletTexture->Init();
+    next_cannon = RightCannon;
 
     invaders_direction = Right;
     invaders_straight_distance = 0;
@@ -135,8 +177,14 @@ public:
     }
 
     updateCannon();
+    updateBullets();
+    bulletTexture->Update();
     updateInvaders();
     invaderTexture->Update();
+
+    if (IsKeyPressed(KEY_F)) {
+      shoot();
+    }
   }
 
   bool Lost() { return dead; }
@@ -145,7 +193,6 @@ public:
 
 private:
   MovingElement cannon;
-  MovingElement ball;
   std::vector<Invader> invaders;
 
   Texture2D cannonTexture;
@@ -153,6 +200,10 @@ private:
   Vector2 invaders_velocity;
   InvaderDirection invaders_direction;
   float invaders_straight_distance;
+
+  std::unique_ptr<AnimatedTexture> bulletTexture;
+  std::vector<Bullet> bullets;
+  CannonSide next_cannon;
 
   int score;
   int lives;
@@ -181,6 +232,30 @@ private:
     if (cannon.position.x == 0 ||
         cannon.position.x == Width() - cannon.size.x) {
       cannon.velocity.x = -cannon.velocity.x / 4;
+    }
+  }
+
+  void updateBullets() {
+    for (auto &bullet : bullets) {
+      bullet.element.position += bullet.element.velocity * GetFrameTime();
+
+      if (bullet.element.position.y < -bullet.element.size.y) {
+        bullet.state = Dead;
+      }
+    }
+
+    int dead_bullets = 0;
+    int last = bullets.size() - 1;
+    for (size_t i = 0; i < bullets.size(); i++) {
+      if (bullets[i].state != Dead) {
+        continue;
+      }
+
+      bullets[i] = bullets.back();
+      bullets.pop_back();
+      dead_bullets++;
+      last--;
+      i--;
     }
   }
 
@@ -245,102 +320,26 @@ private:
     }
   }
 
-  void updateBall() {
-    ball.position += ball.velocity;
-
-    // Bouncing against the wall
-    float right_wall = Width() - ball.size.x;
-    if (ball.position.x > right_wall) {
-      ball.position.x = 2 * right_wall - ball.position.x;
-      ball.velocity.x = -ball.velocity.x;
+  void shoot() {
+    int offset = -8;
+    if (next_cannon == RightCannon) {
+      offset = 8;
+      next_cannon = LeftCannon;
+    } else {
+      next_cannon = RightCannon;
     }
+    MovingElement mbullet = {
+        .position = {cannon.position.x + cannon.size.x / 2 - 8 + offset,
+                     cannon.position.y},
+        .size = {16, 16},
+        .velocity = {0, -BALL_SPEED},
+    };
+    Bullet bullet = {
+        .element = mbullet,
+        .state = Alive,
+    };
 
-    if (ball.position.x < 0) {
-      ball.position.x = -ball.position.x;
-      ball.velocity.x = -ball.velocity.x;
-    }
-
-    float bottom_wall = Height() - ball.size.y;
-    if (ball.position.y > bottom_wall) {
-      ball.position.y = 2 * bottom_wall - ball.position.y;
-      ball.velocity.y = -ball.velocity.y;
-      dying = true;
-    }
-
-    if (ball.position.y < 0) {
-      ball.position.y = -ball.position.y;
-      ball.velocity.y = -ball.velocity.y;
-    }
-
-    // Bouncing against the paddle
-    ballCollision = GetCollisionRec(
-        Rectangle{cannon.position.x, cannon.position.y, cannon.size.x,
-                  cannon.size.y},
-        Rectangle{ball.position.x, ball.position.y, ball.size.x, ball.size.y});
-
-    if (ballCollision.height != 0) {
-
-      float velocity_len = Vector2Length(ball.velocity);
-
-      bool collide_top =
-          ballCollision.y == cannon.position.y && ball.velocity.y > 0;
-      bool collide_down = ballCollision.y + ballCollision.height ==
-                              cannon.position.y + cannon.size.y &&
-                          ball.velocity.y < 0;
-      if (collide_top || collide_down) {
-        ball.velocity.y = -ball.velocity.y;
-        ball.velocity.x += cannon.velocity.x / 4;
-      }
-
-      bool collide_left =
-          ballCollision.x == cannon.position.x && ball.velocity.x > 0;
-      bool collide_right = ballCollision.x + ballCollision.width ==
-                               cannon.position.x + cannon.size.x &&
-                           ball.velocity.x < 0;
-      if (collide_left || collide_right) {
-        ball.velocity.x = -ball.velocity.x;
-      }
-
-      ball.velocity = Vector2Normalize(ball.velocity) * velocity_len;
-    }
-
-    // Bouncing against the bricks
-    for (auto &alien : invaders) {
-      if (!alien.alive) {
-        continue;
-      }
-      ballCollision =
-          GetCollisionRec(Rectangle{alien.position.x, alien.position.y,
-                                    alien.size.x, alien.size.y},
-                          Rectangle{ball.position.x, ball.position.y,
-                                    ball.size.x, ball.size.y});
-
-      if (ballCollision.height != 0) {
-        bool collide_top =
-            ballCollision.y == alien.position.y && ball.velocity.y > 0;
-        bool collide_down = ballCollision.y + ballCollision.height ==
-                                alien.position.y + alien.size.y &&
-                            ball.velocity.y < 0;
-        if (collide_top || collide_down) {
-          ball.velocity.y = -ball.velocity.y;
-        }
-
-        bool collide_left =
-            ballCollision.x == alien.position.x && ball.velocity.x > 0;
-        bool collide_right = ballCollision.x + ballCollision.width ==
-                                 alien.position.x + alien.size.x &&
-                             ball.velocity.x < 0;
-        if (collide_left || collide_right) {
-          ball.velocity.x = -ball.velocity.x;
-        }
-
-        alien.alive = false;
-        ball.velocity *= BALL_ACCELERATION_AFTER_BRICK;
-        score++;
-      }
-    }
-
-    ball.velocity = Vector2ClampValue(ball.velocity, 0.1, MAX_BALL_SPEED);
+    bullets.push_back(bullet);
   }
 
   void drawHUD() {
@@ -355,8 +354,6 @@ private:
     DrawText(std::format("SCORE: {}", score).c_str(), Width() - 200, 5, 30,
              RAYWHITE);
   }
-
-  Rectangle ballCollision;
 
   bool dying;
   bool dead;
