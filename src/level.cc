@@ -13,7 +13,7 @@ const int START_BALL_SPEED = 3;
 const int MAX_BALL_SPEED = 10;
 const float BALL_ACCELERATION_AFTER_BRICK = 1.02;
 const int DEATH_TIMER = 120;
-const int DOWN_DISTANCE = 16;
+const int DOWN_DISTANCE = 32;
 const float INVADER_SPEED = 40;
 const int BALL_SPEED = 200;
 
@@ -164,7 +164,8 @@ public:
 
     invaders_direction = Right;
     invaders_straight_distance = 0;
-    invaders_velocity = {INVADER_SPEED, 0};
+    invaders_velocity = {invaders_speed + INVADER_SPEED, 0};
+    invaders_speed = 0;
 
     for (size_t i = 0; i < 16; i++) {
       for (size_t j = 0; j < 5; j++) {
@@ -204,6 +205,7 @@ private:
   Texture2D cannonTexture;
   std::unique_ptr<AnimatedTexture> invaderTexture;
   Vector2 invaders_velocity;
+  float invaders_speed;
   InvaderDirection invaders_direction;
   float invaders_straight_distance;
 
@@ -327,7 +329,7 @@ private:
 
       if (max_x > Width()) {
         invaders_direction = DownThenLeft;
-        invaders_velocity = {0, INVADER_SPEED};
+        invaders_velocity = {0, invaders_speed + INVADER_SPEED};
         invaders_straight_distance = 0;
       }
     } else if (invaders_direction == Left) {
@@ -343,21 +345,23 @@ private:
 
       if (min_x < 0) {
         invaders_direction = DownThenRight;
-        invaders_velocity = {0, INVADER_SPEED};
+        invaders_velocity = {0, invaders_speed + INVADER_SPEED};
         invaders_straight_distance = 0;
       }
     } else if (invaders_direction == DownThenRight) {
 
       if (invaders_straight_distance >= DOWN_DISTANCE) {
         invaders_direction = Right;
-        invaders_velocity = {INVADER_SPEED, 0};
+        invaders_speed += 20;
+        invaders_velocity = {invaders_speed + INVADER_SPEED, 0};
         invaders_straight_distance = 0;
       }
     } else if (invaders_direction == DownThenLeft) {
 
       if (invaders_straight_distance >= DOWN_DISTANCE) {
         invaders_direction = Left;
-        invaders_velocity = {-INVADER_SPEED, 0};
+        invaders_speed += 20;
+        invaders_velocity = {-(invaders_speed + INVADER_SPEED), 0};
         invaders_straight_distance = 0;
       }
     }
@@ -371,11 +375,12 @@ private:
     } else {
       next_cannon = RightCannon;
     }
+    int r = GetRandomValue(-40, 40);
     MovingElement mbullet = {
         .position = {cannon.position.x + cannon.size.x / 2 - 8 + offset,
                      cannon.position.y},
         .size = {16, 16},
-        .velocity = {0, -BALL_SPEED},
+        .velocity = {float(r), -BALL_SPEED},
         .collision_rec = {5, 0, 6, 16},
     };
     Bullet bullet = {
