@@ -12,6 +12,15 @@ const int START_BALL_SPEED = 3;
 const int MAX_BALL_SPEED = 10;
 const float BALL_ACCELERATION_AFTER_BRICK = 1.02;
 const int DEATH_TIMER = 120;
+const int DOWN_DISTANCE = 16;
+const float INVADER_SPEED = 40;
+
+enum InvaderDirection {
+  Right,
+  DownThenRight,
+  DownThenLeft,
+  Left,
+};
 
 struct MovingElement {
   Vector2 position;
@@ -22,7 +31,6 @@ struct MovingElement {
 struct Invader {
   Vector2 position;
   Vector2 size;
-  Vector2 velocity;
 
   bool alive;
 };
@@ -103,12 +111,15 @@ public:
         std::make_unique<AnimatedTexture>("assets/alien-1.png", 4, 4);
     invaderTexture->Init();
 
+    invaders_direction = Right;
+    invaders_straight_distance = 0;
+    invaders_velocity = {INVADER_SPEED, 0};
+
     for (size_t i = 0; i < 16; i++) {
       for (size_t j = 0; j < 5; j++) {
         invaders.push_back({
             .position = {float(20 + i * 40), float(20 + j * 40)},
             .size = {32, 32},
-            .velocity = {1, 0},
             .alive = true,
         });
       }
@@ -124,6 +135,7 @@ public:
     }
 
     updateCannon();
+    updateInvaders();
     invaderTexture->Update();
   }
 
@@ -138,6 +150,9 @@ private:
 
   Texture2D cannonTexture;
   std::unique_ptr<AnimatedTexture> invaderTexture;
+  Vector2 invaders_velocity;
+  InvaderDirection invaders_direction;
+  float invaders_straight_distance;
 
   int score;
   int lives;
@@ -166,6 +181,67 @@ private:
     if (cannon.position.x == 0 ||
         cannon.position.x == Width() - cannon.size.x) {
       cannon.velocity.x = -cannon.velocity.x / 4;
+    }
+  }
+
+  void updateInvaders() {
+    Vector2 frame_velocity = invaders_velocity * GetFrameTime();
+    invaders_straight_distance += frame_velocity.y;
+
+    for (auto &invader : invaders) {
+      if (!invader.alive) {
+        continue;
+      }
+      invader.position = invader.position + frame_velocity;
+    }
+
+    if (invaders_direction == Right) {
+      float max_x = 0;
+      for (auto &invader : invaders) {
+        if (!invader.alive) {
+          continue;
+        }
+        float x = invader.position.x + invader.size.x;
+        if (x > max_x) {
+          max_x = x;
+        }
+      }
+
+      if (max_x > Width()) {
+        invaders_direction = DownThenLeft;
+        invaders_velocity = {0, INVADER_SPEED};
+        invaders_straight_distance = 0;
+      }
+    } else if (invaders_direction == Left) {
+      float min_x = Width();
+      for (auto &invader : invaders) {
+        if (!invader.alive) {
+          continue;
+        }
+        if (invader.position.x < min_x) {
+          min_x = invader.position.x;
+        }
+      }
+
+      if (min_x < 0) {
+        invaders_direction = DownThenRight;
+        invaders_velocity = {0, INVADER_SPEED};
+        invaders_straight_distance = 0;
+      }
+    } else if (invaders_direction == DownThenRight) {
+
+      if (invaders_straight_distance >= DOWN_DISTANCE) {
+        invaders_direction = Right;
+        invaders_velocity = {INVADER_SPEED, 0};
+        invaders_straight_distance = 0;
+      }
+    } else if (invaders_direction == DownThenLeft) {
+
+      if (invaders_straight_distance >= DOWN_DISTANCE) {
+        invaders_direction = Left;
+        invaders_velocity = {-INVADER_SPEED, 0};
+        invaders_straight_distance = 0;
+      }
     }
   }
 
