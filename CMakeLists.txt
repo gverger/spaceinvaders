@@ -9,5 +9,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+set(CMAKE_CXX_FLAGS_DEBUG_INIT "-Wall")
+
 add_subdirectory(graphics)
+add_subdirectory(logic)
 add_subdirectory(src)

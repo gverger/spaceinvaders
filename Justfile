@@ -4,14 +4,14 @@ run:
   ./install/bin/space-invaders
 
 install: compile
-  cmake --install build --config Release --prefix install
+  cmake --install build --config Debug --prefix install
 
 alias build:=compile
 compile:
-  cmake --build build --config Release --parallel 8
+  cmake --build build --config Debug --parallel 8
 
 init:
-  cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+  cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
 
 clean:
   rm -rf build install

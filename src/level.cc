@@ -3,46 +3,21 @@
 #include "graphics/sprites.h"
 #include "raylib.h"
 #include "raymath.h"
+#include "spaceinvaders/cannon.h"
 #include "spaceinvaders/screens.h"
 #include "spaceinvaders/states.h"
 #include <format>
 #include <memory>
 #include <vector>
 
-const int MAX_VELOCITY = 500;
 const int DOWN_DISTANCE = 32;
 const float INVADER_SPEED = 40;
-const float BULLET_SPEED = 200;
 
 enum InvaderDirection {
   Right,
   DownThenRight,
   DownThenLeft,
   Left,
-};
-
-enum CannonSide {
-  RightCannon,
-  LeftCannon,
-};
-
-struct MovingElement {
-  Vector2 position;
-  Vector2 size;
-  Vector2 velocity;
-  Rectangle collision_rec;
-};
-
-enum BulletState {
-  Alive,
-  Exploding,
-  Dead,
-};
-
-struct Bullet {
-  MovingElement element;
-
-  BulletState state;
 };
 
 struct Invader {
@@ -75,26 +50,17 @@ public:
 
   void Draw() override {
 
+    auto element = cannon->Element();
     DrawTexturePro(cannonTexture, {0, 0, 32, 32},
-                   {cannon.position.x + 32, cannon.position.y + 32,
-                    cannon.size.x, cannon.size.y},
-                   {32, 32}, (cannon.velocity.x / 60) * PI / 2, WHITE);
+                   {element.position.x + 32, element.position.y + 32,
+                    element.size.x, element.size.y},
+                   {32, 32}, (element.velocity.x / 60) * PI / 2, WHITE);
 
     for (auto invader : invaders) {
       invaderAnimation->DrawPro(invader.position, invader.size, 0, WHITE);
-      // auto invader_rec = Rectangle{
-      //     invader.position.x + invader.collision_rec.x,
-      //     invader.position.y + invader.collision_rec.y,
-      //     invader.collision_rec.width,
-      //     invader.collision_rec.height,
-      // };
-      // DrawRectangleLinesEx(invader_rec, 2, RED);
     }
 
     for (auto bullet : bullets) {
-      // DrawRectangleLinesEx(
-      //     {bullet.position.x, bullet.position.y, bullet.size.x,
-      //     bullet.size.y}, 2, RED);
       const MovingElement &element = bullet.element;
       bulletAnimation->DrawPro(element.position, element.size, 0, WHITE);
     }
@@ -103,13 +69,6 @@ public:
 
     DrawText(std::format("BALLS: {}", bullets.size()).c_str(), 10, 100, 10,
              RED);
-    // if (!bullets.empty()) {
-    //   DrawText(std::format("BALL: {},{} {},{}", bullets[0].position.x,
-    //                        bullets[0].position.y, bullets[0].size.x,
-    //                        bullets[0].size.y)
-    //                .c_str(),
-    //            10, 120, 10, RED);
-    // }
   };
 
   void Init() {
@@ -124,15 +83,18 @@ public:
     }
 
     dead = false;
-    cannon.size = Vector2{64, 64};
-    cannon.position =
-        Vector2{float(Width() - cannon.size.x) / 2, float(Height()) - 72};
-    cannon.velocity = Vector2Zero();
+    if (cannon == nullptr) {
+      cannon = std::make_unique<Cannon>(
+          [this](Bullet &b) { return spawnBullet(b); }, Width());
+    }
+    cannon->Init({
+        .position = Vector2{float(Width() - 64) / 2, float(Height()) - 72},
+        .size = Vector2{64, 64},
+        .velocity = Vector2Zero(),
+    });
 
     invaderAnimation = std::make_unique<AnimatedSprite>(invaderTexture, 4, 4);
     bulletAnimation = std::make_unique<AnimatedSprite>(bulletTexture, 4, 15);
-
-    next_cannon = RightCannon;
 
     invaders_direction = Right;
     invaders_straight_distance = 0;
@@ -171,12 +133,12 @@ public:
   void Unload() { UnloadTexture(cannonTexture); }
 
 private:
-  MovingElement cannon;
-  std::vector<Invader> invaders;
-
   Texture2D cannonTexture;
   Texture2D invaderTexture;
   Texture2D bulletTexture;
+
+  std::unique_ptr<Cannon> cannon;
+  std::vector<Invader> invaders;
 
   std::unique_ptr<AnimatedSprite> invaderAnimation;
   Vector2 invaders_velocity;
@@ -186,41 +148,11 @@ private:
 
   std::unique_ptr<AnimatedSprite> bulletAnimation;
   std::vector<Bullet> bullets;
-  CannonSide next_cannon;
 
   int score;
   int lives;
 
-  void updateCannon() {
-    bool key_down = false;
-    if (IsKeyDown(KEY_H) || IsKeyDown(KEY_LEFT)) {
-      key_down = true;
-      cannon.velocity.x -= 30;
-    }
-
-    if (IsKeyDown(KEY_L) || IsKeyDown(KEY_RIGHT)) {
-      key_down = true;
-      cannon.velocity.x += 30;
-    }
-
-    if (!key_down) {
-      cannon.velocity = cannon.velocity * 0.9;
-    }
-
-    cannon.velocity.x = Clamp(cannon.velocity.x, -MAX_VELOCITY, MAX_VELOCITY);
-
-    cannon.position.x += cannon.velocity.x * GetFrameTime();
-    cannon.position.x = Clamp(cannon.position.x, 0, Width() - cannon.size.x);
-
-    if (cannon.position.x == 0 ||
-        cannon.position.x == Width() - cannon.size.x) {
-      cannon.velocity.x = -cannon.velocity.x / 4;
-    }
-
-    if (IsKeyPressed(KEY_F)) {
-      shoot();
-    }
-  }
+  void updateCannon() { cannon->Update(GetFrameTime()); }
 
   void updateBullets() {
     for (auto &bullet : bullets) {
@@ -336,28 +268,7 @@ private:
     }
   }
 
-  void shoot() {
-    int offset = -8;
-    if (next_cannon == RightCannon) {
-      offset = 8;
-      next_cannon = LeftCannon;
-    } else {
-      next_cannon = RightCannon;
-    }
-    Bullet bullet = {
-        .element =
-            {
-                .position = {cannon.position.x + cannon.size.x / 2 - 8 + offset,
-                             cannon.position.y},
-                .size = {16, 16},
-                .velocity = {0, -BULLET_SPEED},
-                .collision_rec = {5, 0, 6, 16},
-            },
-        .state = Alive,
-    };
-
-    bullets.push_back(bullet);
-  }
+  void spawnBullet(Bullet &b) { bullets.push_back(b); }
 
   void drawHUD() {
     DrawCenteredText(20, "H: move left, L: move right", 20, GRAY);
