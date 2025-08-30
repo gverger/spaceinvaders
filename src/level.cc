@@ -277,6 +277,7 @@ private:
         if (col.height > 0 && col.width > 0) {
           invader.alive = false;
           bullet.state = Dead;
+          score++;
           break;
         }
       }
@@ -375,12 +376,11 @@ private:
     } else {
       next_cannon = RightCannon;
     }
-    int r = GetRandomValue(-40, 40);
     MovingElement mbullet = {
         .position = {cannon.position.x + cannon.size.x / 2 - 8 + offset,
                      cannon.position.y},
         .size = {16, 16},
-        .velocity = {float(r), -BALL_SPEED},
+        .velocity = {0, -BALL_SPEED},
         .collision_rec = {5, 0, 6, 16},
     };
     Bullet bullet = {
