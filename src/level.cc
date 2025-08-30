@@ -33,6 +33,7 @@ struct MovingElement {
   Vector2 position;
   Vector2 size;
   Vector2 velocity;
+  Rectangle collision_rec;
 };
 
 enum BulletState {
@@ -50,6 +51,7 @@ struct Bullet {
 struct Invader {
   Vector2 position;
   Vector2 size;
+  Rectangle collision_rec;
 
   bool alive;
 };
@@ -112,6 +114,13 @@ public:
       }
 
       invaderTexture->DrawPro(invader.position, invader.size, 0, WHITE);
+      // auto invader_rec = Rectangle{
+      //     invader.position.x + invader.collision_rec.x,
+      //     invader.position.y + invader.collision_rec.y,
+      //     invader.collision_rec.width,
+      //     invader.collision_rec.height,
+      // };
+      // DrawRectangleLinesEx(invader_rec, 2, RED);
     }
 
     for (auto bullet : bullets) {
@@ -162,6 +171,7 @@ public:
         invaders.push_back({
             .position = {float(20 + i * 40), float(20 + j * 40)},
             .size = {32, 32},
+            .collision_rec = {2, 4, 28, 16},
             .alive = true,
         });
       }
@@ -181,10 +191,6 @@ public:
     bulletTexture->Update();
     updateInvaders();
     invaderTexture->Update();
-
-    if (IsKeyPressed(KEY_F)) {
-      shoot();
-    }
   }
 
   bool Lost() { return dead; }
@@ -210,12 +216,12 @@ private:
 
   void updateCannon() {
     bool key_down = false;
-    if (IsKeyDown(KEY_H)) {
+    if (IsKeyDown(KEY_H) || IsKeyDown(KEY_LEFT)) {
       key_down = true;
       cannon.velocity.x -= 30;
     }
 
-    if (IsKeyDown(KEY_L)) {
+    if (IsKeyDown(KEY_L) || IsKeyDown(KEY_RIGHT)) {
       key_down = true;
       cannon.velocity.x += 30;
     }
@@ -233,6 +239,10 @@ private:
         cannon.position.x == Width() - cannon.size.x) {
       cannon.velocity.x = -cannon.velocity.x / 4;
     }
+
+    if (IsKeyPressed(KEY_F)) {
+      shoot();
+    }
   }
 
   void updateBullets() {
@@ -241,6 +251,32 @@ private:
 
       if (bullet.element.position.y < -bullet.element.size.y) {
         bullet.state = Dead;
+        continue;
+      }
+
+      auto bullet_rec = Rectangle{
+          bullet.element.position.x + bullet.element.collision_rec.x,
+          bullet.element.position.y + bullet.element.collision_rec.y,
+          bullet.element.collision_rec.width,
+          bullet.element.collision_rec.height,
+      };
+
+      for (auto &invader : invaders) {
+        if (!invader.alive) {
+          continue;
+        }
+        auto invader_rec = Rectangle{
+            invader.position.x + invader.collision_rec.x,
+            invader.position.y + invader.collision_rec.y,
+            invader.collision_rec.width,
+            invader.collision_rec.height,
+        };
+        auto col = GetCollisionRec(bullet_rec, invader_rec);
+        if (col.height > 0 && col.width > 0) {
+          invader.alive = false;
+          bullet.state = Dead;
+          break;
+        }
       }
     }
 
@@ -263,10 +299,17 @@ private:
     Vector2 frame_velocity = invaders_velocity * GetFrameTime();
     invaders_straight_distance += frame_velocity.y;
 
-    for (auto &invader : invaders) {
-      if (!invader.alive) {
+    for (size_t i = 0; i < invaders.size(); i++) {
+      if (invaders[i].alive) {
         continue;
       }
+
+      invaders[i] = invaders.back();
+      invaders.pop_back();
+      --i;
+    }
+
+    for (auto &invader : invaders) {
       invader.position = invader.position + frame_velocity;
     }
 
@@ -333,6 +376,7 @@ private:
                      cannon.position.y},
         .size = {16, 16},
         .velocity = {0, -BALL_SPEED},
+        .collision_rec = {5, 0, 6, 16},
     };
     Bullet bullet = {
         .element = mbullet,
