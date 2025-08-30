@@ -4,6 +4,7 @@
 #include "spaceinvaders/screens.h"
 #include "spaceinvaders/states.h"
 #include <format>
+#include <memory>
 #include <vector>
 
 const int MAX_VELOCITY = 500;
@@ -26,13 +27,54 @@ struct Invader {
   bool alive;
 };
 
+class AnimatedTexture {
+
+public:
+  AnimatedTexture(const char *image_file, int nb_frames, int frame_speed)
+      : texture(LoadTexture(image_file)), nb_frames(nb_frames),
+        frame_speed(frame_speed) {}
+
+  ~AnimatedTexture() { UnloadTexture(texture); }
+
+  void Update() {
+    frame_counter++;
+    if (frame_counter >= 60 / frame_speed) {
+      frame_counter = 0;
+      current_frame++;
+      if (current_frame >= nb_frames) {
+        current_frame = 0;
+      }
+    }
+  }
+
+  void DrawPro(Vector2 position, Vector2 size, float rotation, Color tint) {
+    DrawTexturePro(
+        texture,
+        {float(current_frame * 16), 0, float(texture.height),
+         float(texture.height)},
+        {position.x + size.x / 2, position.y + size.y / 2, size.x, size.y},
+        {size.x / 2, size.y / 2}, rotation, tint);
+  }
+
+  void Init() {
+    frame_counter = 0;
+    current_frame = 0;
+  }
+
+private:
+  int frame_counter;
+  int nb_frames;
+  int frame_speed; // nb images per second
+  int current_frame;
+  Texture2D texture;
+};
+
 class Level : public Screen {
 
 public:
   void Draw() override {
-    // DrawRectangleV(cannon.position, cannon.size, BLUE);
 
-    DrawTexturePro(shipTexture, {0, 0, 32, 32},
+    DrawTexturePro(cannonTexture, {0, 0, 32, 32},
                    {cannon.position.x + 32, cannon.position.y + 32,
                     cannon.size.x, cannon.size.y},
                    {32, 32}, (cannon.velocity.x / 60) * PI / 2, WHITE);
@@ -42,10 +84,7 @@ public:
         continue;
       }
 
-      DrawTexturePro(invaderTexture, {0, 0, 16, 16},
-                     {invader.position.x + 32, invader.position.y + 32,
-                      invader.size.x, invader.size.y},
-                     {16, 16}, 0, WHITE);
+      invaderTexture->DrawPro(invader.position, invader.size, 0, WHITE);
     }
 
     drawHUD();
@@ -58,8 +97,11 @@ public:
         Vector2{float(Width() - cannon.size.x) / 2, float(Height()) - 72};
     cannon.velocity = Vector2Zero();
 
-    shipTexture = LoadTexture("assets/cannon.png");
-    invaderTexture = LoadTexture("assets/alien-1.png");
+    cannonTexture = LoadTexture("assets/cannon.png");
+
+    invaderTexture =
+        std::make_unique<AnimatedTexture>("assets/alien-1.png", 4, 4);
+    invaderTexture->Init();
 
     for (size_t i = 0; i < 16; i++) {
       for (size_t j = 0; j < 5; j++) {
@@ -82,22 +124,20 @@ public:
     }
 
     updateCannon();
+    invaderTexture->Update();
   }
 
   bool Lost() { return dead; }
 
-  void Unload() {
-    UnloadTexture(shipTexture);
-    UnloadTexture(invaderTexture);
-  }
+  void Unload() { UnloadTexture(cannonTexture); }
 
 private:
   MovingElement cannon;
   MovingElement ball;
   std::vector<Invader> invaders;
 
-  Texture2D shipTexture;
-  Texture2D invaderTexture;
+  Texture2D cannonTexture;
+  std::unique_ptr<AnimatedTexture> invaderTexture;
 
   int score;
   int lives;
