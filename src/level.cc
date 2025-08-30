@@ -6,7 +6,7 @@
 #include <format>
 #include <vector>
 
-const int MAX_VELOCITY = 10;
+const int MAX_VELOCITY = 500;
 const int START_BALL_SPEED = 3;
 const int MAX_BALL_SPEED = 10;
 const float BALL_ACCELERATION_AFTER_BRICK = 1.02;
@@ -18,9 +18,10 @@ struct MovingElement {
   Vector2 velocity;
 };
 
-struct Alien {
+struct Invader {
   Vector2 position;
   Vector2 size;
+  Vector2 velocity;
 
   bool alive;
 };
@@ -31,15 +32,20 @@ public:
   void Draw() override {
     // DrawRectangleV(cannon.position, cannon.size, BLUE);
 
-    DrawTexturePro(
-        shipTexture, {0, 0, 32, 32},
-        {cannon.position.x+32, cannon.position.y+32, cannon.size.x, cannon.size.y},
-        {32, 32}, cannon.velocity.x * PI / 2, WHITE);
+    DrawTexturePro(shipTexture, {0, 0, 32, 32},
+                   {cannon.position.x + 32, cannon.position.y + 32,
+                    cannon.size.x, cannon.size.y},
+                   {32, 32}, (cannon.velocity.x / 60) * PI / 2, WHITE);
 
-    for (auto b : aliens) {
-      if (!b.alive) {
+    for (auto invader : invaders) {
+      if (!invader.alive) {
         continue;
       }
+
+      DrawTexturePro(invaderTexture, {0, 0, 16, 16},
+                     {invader.position.x + 32, invader.position.y + 32,
+                      invader.size.x, invader.size.y},
+                     {16, 16}, 0, WHITE);
     }
 
     drawHUD();
@@ -53,6 +59,19 @@ public:
     cannon.velocity = Vector2Zero();
 
     shipTexture = LoadTexture("assets/cannon.png");
+    invaderTexture = LoadTexture("assets/alien-1.png");
+
+    for (size_t i = 0; i < 16; i++) {
+      for (size_t j = 0; j < 5; j++) {
+        invaders.push_back({
+            .position = {float(20 + i * 40), float(20 + j * 40)},
+            .size = {32, 32},
+            .velocity = {1, 0},
+            .alive = true,
+        });
+      }
+    }
+
     score = 0;
     lives = 3;
   }
@@ -67,12 +86,18 @@ public:
 
   bool Lost() { return dead; }
 
+  void Unload() {
+    UnloadTexture(shipTexture);
+    UnloadTexture(invaderTexture);
+  }
+
 private:
   MovingElement cannon;
   MovingElement ball;
-  std::vector<Alien> aliens;
+  std::vector<Invader> invaders;
 
   Texture2D shipTexture;
+  Texture2D invaderTexture;
 
   int score;
   int lives;
@@ -81,12 +106,12 @@ private:
     bool key_down = false;
     if (IsKeyDown(KEY_H)) {
       key_down = true;
-      cannon.velocity.x -= 0.5;
+      cannon.velocity.x -= 30;
     }
 
     if (IsKeyDown(KEY_L)) {
       key_down = true;
-      cannon.velocity.x += 0.5;
+      cannon.velocity.x += 30;
     }
 
     if (!key_down) {
@@ -95,7 +120,7 @@ private:
 
     cannon.velocity.x = Clamp(cannon.velocity.x, -MAX_VELOCITY, MAX_VELOCITY);
 
-    cannon.position.x += cannon.velocity.x;
+    cannon.position.x += cannon.velocity.x * GetFrameTime();
     cannon.position.x = Clamp(cannon.position.x, 0, Width() - cannon.size.x);
 
     if (cannon.position.x == 0 ||
@@ -164,7 +189,7 @@ private:
     }
 
     // Bouncing against the bricks
-    for (auto &alien : aliens) {
+    for (auto &alien : invaders) {
       if (!alien.alive) {
         continue;
       }
@@ -233,6 +258,7 @@ void UpdateLevel() {
   }
 
   if (Level.Lost()) {
+    Level.Unload();
     GoToMenu();
     return;
   }
