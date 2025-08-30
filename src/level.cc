@@ -12,7 +12,7 @@
 const int MAX_VELOCITY = 500;
 const int DOWN_DISTANCE = 32;
 const float INVADER_SPEED = 40;
-const int BALL_SPEED = 200;
+const float BULLET_SPEED = 200;
 
 enum InvaderDirection {
   Right,
@@ -344,15 +344,15 @@ private:
     } else {
       next_cannon = RightCannon;
     }
-    MovingElement mbullet = {
-        .position = {cannon.position.x + cannon.size.x / 2 - 8 + offset,
-                     cannon.position.y},
-        .size = {16, 16},
-        .velocity = {0, -BALL_SPEED},
-        .collision_rec = {5, 0, 6, 16},
-    };
     Bullet bullet = {
-        .element = mbullet,
+        .element =
+            {
+                .position = {cannon.position.x + cannon.size.x / 2 - 8 + offset,
+                             cannon.position.y},
+                .size = {16, 16},
+                .velocity = {0, -BULLET_SPEED},
+                .collision_rec = {5, 0, 6, 16},
+            },
         .state = Alive,
     };
 
