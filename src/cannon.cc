@@ -113,5 +113,5 @@ Cannon::Cannon(std::function<void(Bullet &)> spawn_bullet, int screen_width)
 
 void Cannon::Init(const MovingElement &starting_position) {
   element = starting_position;
-  cannon_side.Change(LeftReady);
+  cannon_side.Start(LeftReady);
 }

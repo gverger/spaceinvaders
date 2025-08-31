@@ -4,6 +4,7 @@
 #include "raylib.h"
 #include "raymath.h"
 #include "spaceinvaders/cannon.h"
+#include "spaceinvaders/invaders.h"
 #include "spaceinvaders/screens.h"
 #include "spaceinvaders/states.h"
 #include <format>
@@ -18,14 +19,6 @@ enum InvaderDirection {
   DownThenRight,
   DownThenLeft,
   Left,
-};
-
-struct Invader {
-  Vector2 position;
-  Vector2 size;
-  Rectangle collision_rec;
-
-  bool alive;
 };
 
 Rectangle translateRec(Rectangle rec, Vector2 offset) {
@@ -56,7 +49,7 @@ public:
                     element.size.x, element.size.y},
                    {32, 32}, (element.velocity.x / 60) * PI / 2, WHITE);
 
-    for (auto invader : invaders) {
+    for (auto invader : invader_group.Invaders()) {
       invaderAnimation->DrawPro(invader.position, invader.size, 0, WHITE);
     }
 
@@ -96,21 +89,7 @@ public:
     invaderAnimation = std::make_unique<AnimatedSprite>(invaderTexture, 4, 4);
     bulletAnimation = std::make_unique<AnimatedSprite>(bulletTexture, 4, 15);
 
-    invaders_direction = Right;
-    invaders_straight_distance = 0;
-    invaders_velocity = {invaders_speed + INVADER_SPEED, 0};
-    invaders_speed = 0;
-
-    for (size_t i = 0; i < 16; i++) {
-      for (size_t j = 0; j < 5; j++) {
-        invaders.push_back({
-            .position = {float(20 + i * 40), float(20 + j * 40)},
-            .size = {32, 32},
-            .collision_rec = {2, 4, 28, 16},
-            .alive = true,
-        });
-      }
-    }
+    invader_group.Init(Width());
 
     score = 0;
     lives = 3;
@@ -138,13 +117,9 @@ private:
   Texture2D bulletTexture;
 
   std::unique_ptr<Cannon> cannon;
-  std::vector<Invader> invaders;
 
   std::unique_ptr<AnimatedSprite> invaderAnimation;
-  Vector2 invaders_velocity;
-  float invaders_speed;
-  InvaderDirection invaders_direction;
-  float invaders_straight_distance;
+  InvaderGroup invader_group;
 
   std::unique_ptr<AnimatedSprite> bulletAnimation;
   std::vector<Bullet> bullets;
@@ -166,7 +141,7 @@ private:
       auto bullet_rec =
           translateRec(bullet.element.collision_rec, bullet.element.position);
 
-      for (auto &invader : invaders) {
+      for (auto &invader : invader_group.Invaders()) {
         if (!invader.alive) {
           continue;
         }
@@ -198,75 +173,7 @@ private:
     }
   }
 
-  void updateInvaders() {
-    Vector2 frame_velocity = invaders_velocity * GetFrameTime();
-    invaders_straight_distance += frame_velocity.y;
-
-    for (size_t i = 0; i < invaders.size(); i++) {
-      if (invaders[i].alive) {
-        continue;
-      }
-
-      invaders[i] = invaders.back();
-      invaders.pop_back();
-      --i;
-    }
-
-    for (auto &invader : invaders) {
-      invader.position = invader.position + frame_velocity;
-    }
-
-    if (invaders_direction == Right) {
-      float max_x = 0;
-      for (auto &invader : invaders) {
-        if (!invader.alive) {
-          continue;
-        }
-        float x = invader.position.x + invader.size.x;
-        if (x > max_x) {
-          max_x = x;
-        }
-      }
-
-      if (max_x > Width()) {
-        invaders_direction = DownThenLeft;
-        invaders_velocity = {0, invaders_speed + INVADER_SPEED};
-        invaders_straight_distance = 0;
-      }
-    } else if (invaders_direction == Left) {
-      float min_x = Width();
-      for (auto &invader : invaders) {
-        if (!invader.alive) {
-          continue;
-        }
-        if (invader.position.x < min_x) {
-          min_x = invader.position.x;
-        }
-      }
-
-      if (min_x < 0) {
-        invaders_direction = DownThenRight;
-        invaders_velocity = {0, invaders_speed + INVADER_SPEED};
-        invaders_straight_distance = 0;
-      }
-    } else if (invaders_direction == DownThenRight) {
-
-      if (invaders_straight_distance >= DOWN_DISTANCE) {
-        invaders_direction = Right;
-        invaders_speed += 20;
-        invaders_velocity = {invaders_speed + INVADER_SPEED, 0};
-        invaders_straight_distance = 0;
-      }
-    } else if (invaders_direction == DownThenLeft) {
-
-      if (invaders_straight_distance >= DOWN_DISTANCE) {
-        invaders_direction = Left;
-        invaders_speed += 20;
-        invaders_velocity = {-(invaders_speed + INVADER_SPEED), 0};
-        invaders_straight_distance = 0;
-      }
-    }
-  }
+  void updateInvaders() { invader_group.Update(GetFrameTime()); }
 
   void spawnBullet(Bullet &b) { bullets.push_back(b); }
 

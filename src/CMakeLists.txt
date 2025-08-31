@@ -1,5 +1,6 @@
 add_executable(${PROJECT_NAME}
   cannon.cc
+  invaders.cc
   level.cc
   main.cc
   menu.cc
