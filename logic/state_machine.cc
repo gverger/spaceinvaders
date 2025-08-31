@@ -26,4 +26,7 @@ void StateMachine::Start(StateID start_state_id) {
 
 void StateMachine::HandleInput() { states[current]->HandleInput(); }
 
-void StateMachine::Update(float dt) { states[current]->Update(dt); }
+void StateMachine::Update(float dt) {
+  assert(states.contains(current));
+  states[current]->Update(dt);
+}

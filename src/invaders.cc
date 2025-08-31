@@ -19,9 +19,6 @@ public:
     Vector2 frame_velocity = group.Velocity() * dt;
 
     for (auto &invader : group.Invaders()) {
-      if (!invader.alive) {
-        continue;
-      }
       if (invader.position.x < 0) {
         movement_state.Change(MovingDownLeftSideID);
         return;
@@ -47,9 +44,6 @@ public:
     Vector2 frame_velocity = group.Velocity() * dt;
 
     for (auto &invader : group.Invaders()) {
-      if (!invader.alive) {
-        continue;
-      }
       if (invader.position.x + invader.size.x > group.ScreenWidth()) {
         movement_state.Change(MovingDownRightSideID);
         return;
