@@ -4,7 +4,7 @@
 
 void AnimatedSprite::Update() {
   time_in_current += GetFrameTime();
-  if (time_in_current >= 1 / frame_speed) {
+  if (time_in_current >= 1. / frame_speed) {
     time_in_current = 0;
     current_frame++;
     if (current_frame >= nb_frames) {
