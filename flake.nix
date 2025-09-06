@@ -23,6 +23,8 @@
             pkgs.just
             pkgs.raylib
             # pkgs.emscripten # websupport for raylib
+
+            pkgs.clang-tools
           ];
 
           # Audio dependencies
